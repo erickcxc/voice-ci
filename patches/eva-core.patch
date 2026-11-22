@@ -1,0 +1,105 @@
+diff --git a/src/eva/metrics/validation/conversation_valid_end.py b/src/eva/metrics/validation/conversation_valid_end.py
+index 21cf862..2d6520b 100644
+--- a/src/eva/metrics/validation/conversation_valid_end.py
++++ b/src/eva/metrics/validation/conversation_valid_end.py
+@@ -100,6 +100,13 @@ class ConversationValidEndMetric(CodeMetric):
+             details = data.get("details", {})
+             reason = details.get("reason")
+ 
++            # voice-ci: an agent that hangs up after its goodbye ends the call validly,
++            # but only when the adapter logged a deliberate hangup.
++            if reason == "assistant_disconnect":
++                fw = output_dir / "framework_logs.jsonl"
++                if fw.exists() and '"hangup"' in fw.read_text():
++                    reason = "goodbye"
++
+             if reason != "goodbye":
+                 return MetricScore(
+                     name=self.name,
+diff --git a/src/eva/models/config.py b/src/eva/models/config.py
+index 9087c65..b51b7f1 100644
+--- a/src/eva/models/config.py
++++ b/src/eva/models/config.py
+@@ -579,7 +579,7 @@ class RunConfig(BaseSettings):
+ 
+     # Framework selection
+     framework: Literal[
+-        "pipecat", "openai_realtime", "gemini_live", "elevenlabs", "grok_voice", "smallest_hydra", "cartesia"
++        "pipecat", "openai_realtime", "openai_live", "gemini_live", "elevenlabs", "grok_voice", "smallest_hydra", "cartesia"
+     ] = Field(
+         "pipecat",
+         description=(
+@@ -601,7 +601,7 @@ class RunConfig(BaseSettings):
+     )
+ 
+     # Data paths
+-    domain: Literal["airline", "itsm", "medical_hr"] = "airline"
++    domain: str = "airline"  # voice-ci: any domain built by voice-ci build
+ 
+     # Rerun settings
+     max_rerun_attempts: int = Field(3, ge=0, le=20, description="Maximum number of rerun attempts for failed records")
+diff --git a/src/eva/orchestrator/worker.py b/src/eva/orchestrator/worker.py
+index 128b2f8..2471df9 100644
+--- a/src/eva/orchestrator/worker.py
++++ b/src/eva/orchestrator/worker.py
+@@ -37,6 +37,10 @@ def _get_server_class(framework: str) -> type[AbstractAssistantServer]:
+         from eva.assistant.openai_realtime_server import OpenAIRealtimeAssistantServer
+ 
+         return OpenAIRealtimeAssistantServer
++    elif framework == "openai_live":
++        from eva.assistant.openai_live_server import OpenAILiveAssistantServer
++
++        return OpenAILiveAssistantServer
+     elif framework == "gemini_live":
+         from eva.assistant.gemini_live_server import GeminiLiveAssistantServer
+ 
+diff --git a/src/eva/utils/culture.py b/src/eva/utils/culture.py
+index 4c50757..f0469aa 100644
+--- a/src/eva/utils/culture.py
++++ b/src/eva/utils/culture.py
+@@ -18,6 +18,7 @@ Translated opening utterances live at ``user_goal.<language>_starting_utterance`
+ 
+ from __future__ import annotations
+ 
++import os
+ import copy
+ import json
+ import re
+@@ -308,6 +309,9 @@ def get_initial_message(language: str) -> str:
+ 
+     Falls back to English. Raises if even English is missing.
+     """
++    override = os.environ.get("EVA_INITIAL_MESSAGE")  # voice-ci: the agent's own greeting
++    if override:
++        return override
+     msgs = _load_initial_messages()
+     if language in msgs:
+         return msgs[language]
+diff --git a/src/eva/utils/prompt_manager.py b/src/eva/utils/prompt_manager.py
+index 1060c41..05e1e1a 100644
+--- a/src/eva/utils/prompt_manager.py
++++ b/src/eva/utils/prompt_manager.py
+@@ -65,7 +65,7 @@ class PromptManager:
+         try:
+             with open(file_path, encoding="utf-8") as f:
+                 data = yaml.safe_load(f) or {}
+-            self.prompts.update(data)
++            _deep_merge(self.prompts, data)  # voice-ci: lets extra files add prompts to a section
+             self.loaded_files.append(file_path)
+             logger.info(f"Loaded prompts from {file_path}")
+         except Exception as e:
+@@ -142,6 +142,14 @@ class PromptManager:
+ _prompt_manager: PromptManager | None = None
+ 
+ 
++def _deep_merge(base: dict, extra: dict) -> None:
++    for k, v in extra.items():
++        if isinstance(v, dict) and isinstance(base.get(k), dict):
++            _deep_merge(base[k], v)
++        else:
++            base[k] = v
++
++
+ def get_prompt_manager() -> PromptManager:
+     """Get the global PromptManager instance.
+ 

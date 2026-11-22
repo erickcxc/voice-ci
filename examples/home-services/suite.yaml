@@ -1,0 +1,94 @@
+# Caller suite for the sample agent. Synthetic callers only: made-up people, addresses and 555 numbers.
+# Each caller's `expected` is the record its call must leave (see outcome.mjs).
+business: Brightwater Plumbing, a small plumbing company
+date: 2026-11-23 09:30 EST
+caller_number: +1-555-0100
+escalation: Do not ask for a person or a manager. If offered a transfer, decline.
+edges:
+- Only give your name or address when the agent asks for them.
+- If the agent asks anything else you do not have an answer for, say you are not sure.
+- Never invent new goals, requests, or problems beyond what is defined here.
+personas:
+  brisk: You're friendly but busy, calling on a break. Short answers, no small talk.
+  stressed: You're stressed and talking fast because water is coming through your ceiling.
+  chatty: You're warm and a little chatty, an older homeowner who likes to explain things.
+  salesy: You're an upbeat, scripted sales rep who keeps pushing your pitch.
+
+callers:
+- id: J1
+  name: Priya Nandakumar
+  gender: woman
+  persona: brisk
+  goal: You want someone to replace your old water heater, which takes forever to get hot.
+  opener: Hi, I need a quote on replacing my water heater.
+  must:
+  - Mike takes your name and address and says someone will follow up.
+  behavior:
+  - Answer each question Mike asks with just that piece of information.
+  - If Mike asks you to spell your last name, spell it letter by letter.
+  resolution: Mike has said Sam will text you to confirm a time. Say thanks and end the call.
+  failure: If Mike will not take the job after you gave your name and address, say thanks and end the call.
+  info:
+    Full name: Priya Nandakumar
+    Property address: 2207 Linden Court, Springfield
+    Is water leaking: No, it just heats slowly.
+  expected: {verdict: customer, job: true, urgent: false, last_name: nandakumar, house_number: '2207'}
+  premise: Homeowner wants an old water heater replaced. Not urgent.
+  flow: Standard job intake.
+
+- id: J2
+  name: Tom Okafor
+  gender: man
+  persona: stressed
+  goal: A pipe burst upstairs and water is coming through your kitchen ceiling. You need help today.
+  opener: Hi, I've got water pouring through my kitchen ceiling, can someone come out?
+  must:
+  - Mike treats this as urgent.
+  behavior:
+  - Sound rushed. Give your details when asked.
+  resolution: Mike has said Sam will call you right back. Say thank you and end the call.
+  failure: If Mike does not take your details, say you'll call someone else and end the call.
+  info:
+    Full name: Tom Okafor
+    Property address: 58 Harbor Street, Springfield
+    Is water leaking: Yes, right now, through the ceiling.
+  expected: {verdict: customer, job: true, urgent: true, last_name: okafor, house_number: '58'}
+  premise: Burst pipe with water coming through a ceiling. Urgent.
+  flow: Urgent job intake.
+
+- id: M1
+  name: Linda Reyes
+  gender: woman
+  persona: chatty
+  goal: Sam fixed your sink last week and you want to ask whether the invoice includes the new faucet. You just want to leave a message.
+  opener: Hi, Sam was out last week for my sink and I had a question about the bill.
+  must:
+  - Mike takes your name and your question as a message for Sam.
+  behavior:
+  - You do not need any new work done.
+  resolution: Mike has said he will pass your message to Sam. Say goodbye and end the call.
+  failure: If Mike tries to book new work, say you only wanted to leave a message, then end the call.
+  info:
+    Full name: Linda Reyes
+    Question: Does last week's invoice include the new faucet?
+  expected: {verdict: message, job: false, urgent: false, last_name: reyes, house_number: null}
+  premise: Existing customer with a billing question.
+  flow: Take a message.
+
+- id: S1
+  name: Kyle Mercer
+  gender: man
+  persona: salesy
+  goal: You sell online ads to local businesses and want to pitch the owner.
+  opener: Hi there, I'm calling about getting Brightwater to the top of Google this month.
+  must:
+  - Mike politely declines and does not take down a job.
+  behavior:
+  - Push your pitch once more if Mike declines.
+  resolution: Mike has declined twice. Say okay, thanks, and end the call.
+  failure: If Mike asks for your address, give a made-up one and end the call.
+  info:
+    Full name: Kyle Mercer
+  expected: {verdict: spam, job: false, urgent: false, last_name: null, house_number: null}
+  premise: Cold sales call.
+  flow: Decline politely.

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# voice-ci: regression tests for voice agents, on ServiceNow/eva.
+#   voice-ci setup                      clone EVA at the pinned commit, apply patches, install
+#   voice-ci run <agent_dir> [ID ...]   prepare, build, call, score (exit 1 on any wrong outcome)
+#   voice-ci score <agent_dir> [run]    rescore the newest (or a given) run
+# Keys come from the environment (OPENAI_API_KEY, GEMINI_API_KEY); never from files here.
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd)"
+eva="${VOICE_CI_EVA:-$root/.eva}"
+
+setup() {
+  if [ ! -d "$eva/.git" ]; then
+    repo=$(sed -n 's/^repo=//p' "$root/eva.lock"); commit=$(sed -n 's/^commit=//p' "$root/eva.lock")
+    git clone -q "$repo" "$eva" && git -C "$eva" checkout -q "$commit"
+  fi
+  if git -C "$eva" apply --check "$root/patches/eva-core.patch" 2>/dev/null; then
+    git -C "$eva" apply "$root/patches/eva-core.patch"
+  fi
+  ln -sf "$root/voice_ci/adapters/openai_live_server.py" "$eva/src/eva/assistant/openai_live_server.py"
+  (cd "$eva" && uv sync --all-extras -q)
+  echo "voice-ci: EVA ready at $eva"
+}
+
+cmd="${1:-}"; shift || true
+case "$cmd" in
+  setup) setup ;;
+  run|score|build)
+    [ -f "$eva/src/eva/assistant/openai_live_server.py" ] || setup
+    exec uv run --project "$eva" python "$root/voice_ci/cli.py" "$cmd" "$eva" "$@" ;;
+  *) sed -n '2,6p' "$0"; exit 2 ;;
+esac

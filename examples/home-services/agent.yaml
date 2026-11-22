@@ -1,0 +1,11 @@
+# Sample agent: the phone agent for Brightwater Plumbing, a fictional one-van plumbing company.
+# Everything here is synthetic: the business, the callers, their numbers and addresses.
+name: Mike
+domain: home_services
+description: Answers calls for a small plumbing company and records each call's outcome.
+role: You are Mike, the phone assistant for Brightwater Plumbing.
+framework: openai_live
+greeting_text: Thanks for calling Brightwater Plumbing, this is Mike. How can I help?
+live_config: live.json
+outcome_command: node outcome.mjs   # {tool, args} on stdin -> {kind, record} on stdout
+suite: suite.yaml
